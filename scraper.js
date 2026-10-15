@@ -2,8 +2,8 @@ const fs = require('fs');
 
 const url = 'https://cdn.holavonat.is/emig_data_v1.json';
 const dataFile = 'data.json';
+const logFile = 'last_new.json'; // Az új "cetli" fájl
 
-// Rekurzív függvény a UIC számok kinyerésére (ugyanaz a logika, mint eddig)
 function extractUicNumbers(obj, uicSet) {
     if (Array.isArray(obj)) {
         obj.forEach(item => extractUicNumbers(item, uicSet));
@@ -21,7 +21,6 @@ function extractUicNumbers(obj, uicSet) {
 async function run() {
     try {
         console.log('Adatok lekérése a hálózatról...');
-        // Letöltjük az aktuális adatokat (cache-busting paraméterrel)
         const response = await fetch(`${url}?t=${Date.now()}`);
         if (!response.ok) throw new Error(`HTTP hiba: ${response.status}`);
         const liveData = await response.json();
@@ -29,7 +28,6 @@ async function run() {
         let currentUics = new Set();
         extractUicNumbers(liveData, currentUics);
 
-        // Beolvassuk az eddig mentett adatokat a data.json-ből
         let savedUics = new Set();
         if (fs.existsSync(dataFile)) {
             const fileContent = fs.readFileSync(dataFile, 'utf8');
@@ -39,26 +37,33 @@ async function run() {
             }
         }
 
-        // Összehasonlítás és bővítés
-        let newCount = 0;
+        let newUics = [];
         currentUics.forEach(uic => {
             if (!savedUics.has(uic)) {
                 savedUics.add(uic);
-                newCount++;
+                newUics.push(uic);
             }
         });
 
-        // Ha van új adat, felülírjuk a data.json fájlt
-        if (newCount > 0) {
+        // Ha van új adat, elmentjük azokat
+        if (newUics.length > 0) {
             const sortedUics = Array.from(savedUics).sort();
             fs.writeFileSync(dataFile, JSON.stringify(sortedUics, null, 2));
-            console.log(`Siker! ${newCount} ÚJ UIC szám hozzáadva az adatbázishoz. Összesen: ${sortedUics.length} db.`);
+            
+            // Létrehozzuk a weboldalnak szóló naplót
+            const logData = {
+                timestamp: new Date().toISOString(),
+                newUics: newUics
+            };
+            fs.writeFileSync(logFile, JSON.stringify(logData, null, 2));
+
+            console.log(`Siker! ${newUics.length} ÚJ UIC szám hozzáadva az adatbázishoz.`);
         } else {
             console.log('Nincs új UIC szám. Nem történt módosítás.');
         }
     } catch (error) {
         console.error('Hiba történt a futás során:', error);
-        process.exit(1); // Hibás kilépés, így a GitHub jelzi, ha gond van
+        process.exit(1);
     }
 }
 
