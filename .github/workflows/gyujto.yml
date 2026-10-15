@@ -2,14 +2,14 @@ name: UIC Gyujto Robot
 
 on:
   schedule:
-    - cron: '*/10 * * * *' # Minden 10 percben lefut (0-24 órában)
-  workflow_dispatch: # Ezzel a GitHub felületén kézzel is elindíthatod a robotot
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   scrape-and-save:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Engedély a repó módosítására
+      contents: write
 
     steps:
     - name: Repozitórium letöltése
@@ -23,10 +23,9 @@ jobs:
     - name: Adatgyűjtő script (scraper.js) futtatása
       run: node scraper.js
 
-    - name: Új adatok mentése a GitHubra (Commit & Push)
+    - name: Új adatok mentése a GitHubra
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add data.json
+        git add data.json last_new.json
         git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Robot: Új UIC számok mentve" && git push)
-
