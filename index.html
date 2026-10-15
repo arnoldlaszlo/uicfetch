@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UIC Pályaszám Gyűjtő (24/7)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #121212; color: #ffffff; }
+        .table-container { max-height: 70vh; overflow-y: auto; }
+        th { position: sticky; top: 0; background-color: #1f2937; z-index: 10; cursor: pointer; }
+        th:hover { background-color: #374151; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="p-6">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-bold mb-2 text-center text-blue-400">🚂 EMIG UIC Pályaszám Gyűjtő</h1>
+        <p class="text-center text-gray-400 mb-6 text-sm">A szerver a háttérben automatikusan (10 percenként) gyűjti az adatokat. Bezárhatod ezt az oldalt.</p>
+
+        <!-- Vezérlőpult -->
+        <div class="flex flex-wrap justify-between items-center bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700 gap-4">
+            
+            <button onclick="loadData()" id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow transition-colors">
+                Képernyő frissítése
+            </button>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button onclick="copyCollectedData()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">
+                    Gyűjtemény másolása
+                </button>
+                <button onclick="exportCSV()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">
+                    CSV Export
+                </button>
+            </div>
+        </div>
+
+        <!-- Adat oszlopok -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <!-- Bal oszlop: Aktuális -->
+            <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg">
+                    <h2 class="text-xl font-semibold text-blue-400">Éppen a hálózaton</h2>
+                    <span class="bg-blue-900 text-blue-200 py-1 px-3 rounded-full text-sm font-bold">Összesen: <span id="currentCount">0</span></span>
+                </div>
+                <div class="table-container p-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable('currentTableBody')" class="p-3 border-b border-gray-600 group select-none">
+                                    UIC Pályaszám <span class="text-gray-500 group-hover:text-white ml-1">↕</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="currentTableBody">
+                            <tr><td class="p-3 text-gray-400 text-center">Betöltés folyamatban...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Jobb oszlop: Adatbázis -->
+            <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col">
+                <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg">
+                    <h2 class="text-xl font-semibold text-green-400">Adatbázis (GitHub 0-24)</h2>
+                    <span class="bg-green-900 text-green-200 py-1 px-3 rounded-full text-sm font-bold">Összesen: <span id="collectedCount">0</span></span>
+                </div>
+                <div class="table-container p-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable('collectedTableBody')" class="p-3 border-b border-gray-600 group select-none">
+                                    UIC Pályaszám <span class="text-gray-500 group-hover:text-white ml-1">↕</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="collectedTableBody">
+                            <tr><td class="p-3 text-gray-400 text-center">Betöltés folyamatban...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const liveUrl = 'https://cdn.holavonat.is/emig_data_v1.json';
+        const dbUrl = 'data.json';
+        let collectedUics = [];
+
+        window.onload = () => {
+            loadData();
+        };
+
+        function extractUicNumbers(obj, uicSet) {
+            if (Array.isArray(obj)) {
+                obj.forEach(item => extractUicNumbers(item, uicSet));
+            } else if (typeof obj === 'object' && obj !== null) {
+                for (let key in obj) {
+                    if (key === 'uic' && typeof obj[key] === 'string') {
+                        uicSet.add(obj[key].trim());
+                    } else {
+                        extractUicNumbers(obj[key], uicSet);
+                    }
+                }
+            }
+        }
+
+        async function loadData() {
+            const btn = document.getElementById('refreshBtn');
+            btn.innerText = 'Töltés...';
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // 1. Háttérben lévő GitHub adatbázis letöltése
+                let dbData = [];
+                try {
+                    const dbRes = await fetch(`${dbUrl}?t=${Date.now()}`);
+                    if(dbRes.ok) {
+                        dbData = await dbRes.json();
+                        collectedUics = dbData;
+                    }
+                } catch(e) {
+                    console.log("Még nincs adatbázis fájl (data.json) vagy nem elérhető.");
+                }
+                
+                renderTable('collectedTableBody', 'collectedCount', dbData, true);
+
+                // 2. Aktuális élő adatok letöltése
+                const liveRes = await fetch(`${liveUrl}?t=${Date.now()}`);
+                if (!liveRes.ok) throw new Error(`Hiba: ${liveRes.status}`);
+                const liveDataRaw = await liveRes.json();
+                
+                let currentUics = new Set();
+                extractUicNumbers(liveDataRaw, currentUics);
+                const currentArray = Array.from(currentUics);
+
+                renderTable('currentTableBody', 'currentCount', currentArray, false, dbData);
+
+            } catch (error) {
+                console.error(error);
+                alert("Hiba történt az adatok letöltésekor!");
+            } finally {
+                btn.innerText = 'Képernyő frissítése';
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function renderTable(tbodyId, countId, dataArray, isDb, dbData = []) {
+            const tbody = document.getElementById(tbodyId);
+            document.getElementById(countId).innerText = dataArray.length;
+            
+            if (dataArray.length === 0) {
+                tbody.innerHTML = '<tr><td class="p-3 text-gray-400 text-center">Nincs adat. (Ha most csináltad a repót, várj 10 percet a robotra!)</td></tr>';
+                return;
+            }
+
+            // Tisztítás és rendezés beillesztés előtt
+            let html = '';
+            const sortedArray = dataArray.sort((a, b) => cleanUic(a).localeCompare(cleanUic(b), undefined, {numeric: true}));
+
+            sortedArray.forEach(uic => {
+                let colorClass = isDb ? "text-green-300" : "text-gray-300";
+                let extraTag = "";
+                
+                // Ha a bal oszlopot rajzoljuk, és egy szám nincs benne a jobb oszlopban (adatbázisban)
+                if (!isDb && dbData.length > 0 && !dbData.includes(uic)) {
+                    colorClass = "text-yellow-400 font-bold";
+                    extraTag = " <span class='text-xs bg-yellow-600 text-black px-1 rounded ml-2'>ÚJ A HÁLÓZATON</span>";
+                }
+
+                html += `<tr class='border-b border-gray-700 hover:bg-gray-700 transition-colors'><td class='p-3 font-mono ${colorClass}'>${uic}${extraTag}</td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function exportCSV() {
+            if (collectedUics.length === 0) return alert('Nincs mit exportálni!');
+            
+            const dateString = new Date().toISOString().split('T')[0];
+            let csvContent = "UIC Palyaszam\n" + collectedUics.join("\n");
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `UIC-palyaszamok-${dateString}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyCollectedData() {
+            if (collectedUics.length === 0) return alert('Nincs mit másolni!');
+            navigator.clipboard.writeText(collectedUics.join('\n'))
+                .then(() => alert('Másolva!'))
+                .catch(() => alert('Hiba a másoláskor.'));
+        }
+
+        const cleanUic = (str) => str.replace(/[\s-]/g, '');
+        let currentSortDesc = false;
+        let collectedSortDesc = false;
+
+        function sortTable(tbodyId) {
+            const tbody = document.getElementById(tbodyId);
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            if (rows.length === 0 || rows[0].innerText.includes('Nincs')) return;
+
+            const isCurrent = tbodyId === 'currentTableBody';
+            const desc = isCurrent ? currentSortDesc : collectedSortDesc;
+
+            rows.sort((a, b) => {
+                const valA = cleanUic(a.cells[0].innerText.split(' ')[0]); // "ÚJ" taget ne vegye figyelembe
+                const valB = cleanUic(b.cells[0].innerText.split(' ')[0]);
+                return desc ? valB.localeCompare(valA, undefined, {numeric: true}) : valA.localeCompare(valB, undefined, {numeric: true});
+            });
+
+            if (isCurrent) currentSortDesc = !currentSortDesc;
+            else collectedSortDesc = !collectedSortDesc;
+
+            tbody.innerHTML = '';
+            rows.forEach(row => tbody.appendChild(row));
+        }
+    </script>
+</body>
+</html>
