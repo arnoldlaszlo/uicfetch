@@ -29,3 +29,4 @@ jobs:
         git config --local user.name "github-actions[bot]"
         git add data.json
         git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Robot: Új UIC számok mentve" && git push)
+
