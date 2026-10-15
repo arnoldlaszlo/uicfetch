@@ -1,0 +1,31 @@
+name: UIC Gyujto Robot
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Minden 10 percben lefut (0-24 órában)
+  workflow_dispatch: # Ezzel a GitHub felületén kézzel is elindíthatod a robotot
+
+jobs:
+  scrape-and-save:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Engedély a repó módosítására
+
+    steps:
+    - name: Repozitórium letöltése
+      uses: actions/checkout@v4
+
+    - name: Node.js környezet beállítása
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Adatgyűjtő script (scraper.js) futtatása
+      run: node scraper.js
+
+    - name: Új adatok mentése a GitHubra (Commit & Push)
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add data.json
+        git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Robot: Új UIC számok mentve" && git push)
