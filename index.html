@@ -20,29 +20,52 @@
 
     <div class="max-w-7xl mx-auto">
         <h1 class="text-3xl font-bold mb-2 text-center text-blue-400">🚂 EMIG UIC Pályaszám Gyűjtő</h1>
-        <p class="text-center text-gray-400 mb-6 text-sm">A szerver a háttérben automatikusan (10 percenként) gyűjti az adatokat. Bezárhatod ezt az oldalt.</p>
-
-        <!-- Vezérlőpult -->
-        <div class="flex flex-wrap justify-between items-center bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700 gap-4">
-            
-            <button onclick="loadData()" id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow transition-colors">
-                Képernyő frissítése
-            </button>
-
-            <div class="flex flex-wrap items-center gap-3">
-                <button onclick="copyCollectedData()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">
-                    Gyűjtemény másolása
+        
+        <!-- Robot Állapot és Indítás Sáv -->
+        <div class="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700 flex flex-col md:flex-row justify-between items-center shadow-lg gap-4">
+            <div class="flex items-center gap-3">
+                <div id="robotStatusIcon" class="w-4 h-4 rounded-full bg-gray-500 animate-pulse"></div>
+                <div>
+                    <span class="text-gray-400 text-sm">Robot utolsó futása:</span>
+                    <span id="lastRunTime" class="font-bold ml-2 text-white">Betöltés...</span>
+                    <span id="lastRunStatus" class="ml-2 text-sm text-gray-400"></span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="triggerRobot()" id="triggerBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded shadow transition-colors flex items-center gap-2">
+                    ⚡ Robot azonnali indítása
                 </button>
-                <button onclick="exportCSV()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">
-                    CSV Export
+                <button onclick="toggleConfig()" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded shadow transition-colors" title="Beállítások">
+                    ⚙️
                 </button>
             </div>
         </div>
 
-        <!-- Adat oszlopok -->
+        <!-- Beállítások Panel (Alapból rejtett) -->
+        <div id="configPanel" class="hidden bg-gray-900 p-4 rounded-lg mb-6 border border-purple-700 shadow-inner">
+            <h3 class="text-purple-400 font-bold mb-2">🔑 GitHub Kapcsolat Beállítása</h3>
+            <p class="text-sm text-gray-400 mb-4">Ezt csak te látod, a böngésződ memóriájába kerül. Szükséges a robot távoli indításához és állapotának lekéréséhez.</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <input type="text" id="ghUser" placeholder="GitHub Felhasználónév" class="bg-gray-800 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500">
+                <input type="text" id="ghRepo" placeholder="Repozitórium neve (pl. uic-gyujto)" class="bg-gray-800 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500">
+                <input type="password" id="ghToken" placeholder="GitHub Personal Access Token" class="bg-gray-800 border border-gray-600 rounded p-2 text-white outline-none focus:border-purple-500">
+            </div>
+            <button onclick="saveConfig()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded shadow transition-colors">Beállítások Mentése</button>
+        </div>
+
+        <!-- Vezérlőpult (Nézet frissítés, CSV) -->
+        <div class="flex flex-wrap justify-between items-center bg-gray-800 p-4 rounded-lg mb-6 border border-gray-700 gap-4">
+            <button onclick="loadData()" id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow transition-colors">
+                Képernyő frissítése
+            </button>
+            <div class="flex flex-wrap items-center gap-3">
+                <button onclick="copyCollectedData()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">Gyűjtemény másolása</button>
+                <button onclick="exportCSV()" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded shadow transition-colors text-sm">CSV Export</button>
+            </div>
+        </div>
+
+        <!-- Adat oszlopok (Bal: Aktuális, Jobb: Adatbázis) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            <!-- Bal oszlop: Aktuális -->
             <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col">
                 <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg">
                     <h2 class="text-xl font-semibold text-blue-400">Éppen a hálózaton</h2>
@@ -50,42 +73,24 @@
                 </div>
                 <div class="table-container p-4">
                     <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr>
-                                <th onclick="sortTable('currentTableBody')" class="p-3 border-b border-gray-600 group select-none">
-                                    UIC Pályaszám <span class="text-gray-500 group-hover:text-white ml-1">↕</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="currentTableBody">
-                            <tr><td class="p-3 text-gray-400 text-center">Betöltés folyamatban...</td></tr>
-                        </tbody>
+                        <thead><tr><th onclick="sortTable('currentTableBody')" class="p-3 border-b border-gray-600 group select-none">UIC Pályaszám ↕</th></tr></thead>
+                        <tbody id="currentTableBody"><tr><td class="p-3 text-gray-400 text-center">Betöltés...</td></tr></tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Jobb oszlop: Adatbázis -->
             <div class="bg-gray-800 rounded-lg shadow-lg border border-gray-700 flex flex-col">
                 <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 rounded-t-lg">
-                    <h2 class="text-xl font-semibold text-green-400">Adatbázis (GitHub 0-24)</h2>
+                    <h2 class="text-xl font-semibold text-green-400">Adatbázis (GitHub)</h2>
                     <span class="bg-green-900 text-green-200 py-1 px-3 rounded-full text-sm font-bold">Összesen: <span id="collectedCount">0</span></span>
                 </div>
                 <div class="table-container p-4">
                     <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr>
-                                <th onclick="sortTable('collectedTableBody')" class="p-3 border-b border-gray-600 group select-none">
-                                    UIC Pályaszám <span class="text-gray-500 group-hover:text-white ml-1">↕</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="collectedTableBody">
-                            <tr><td class="p-3 text-gray-400 text-center">Betöltés folyamatban...</td></tr>
-                        </tbody>
+                        <thead><tr><th onclick="sortTable('collectedTableBody')" class="p-3 border-b border-gray-600 group select-none">UIC Pályaszám ↕</th></tr></thead>
+                        <tbody id="collectedTableBody"><tr><td class="p-3 text-gray-400 text-center">Betöltés...</td></tr></tbody>
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
 
@@ -94,8 +99,121 @@
         const dbUrl = 'data.json';
         let collectedUics = [];
 
+        // --- Konfiguráció kezelése ---
+        let ghUser = localStorage.getItem('ghUser') || '';
+        let ghRepo = localStorage.getItem('ghRepo') || '';
+        let ghToken = localStorage.getItem('ghToken') || '';
+
+        function toggleConfig() {
+            const panel = document.getElementById('configPanel');
+            panel.classList.toggle('hidden');
+            document.getElementById('ghUser').value = ghUser;
+            document.getElementById('ghRepo').value = ghRepo;
+            document.getElementById('ghToken').value = ghToken;
+        }
+
+        function saveConfig() {
+            ghUser = document.getElementById('ghUser').value.trim();
+            ghRepo = document.getElementById('ghRepo').value.trim();
+            ghToken = document.getElementById('ghToken').value.trim();
+            localStorage.setItem('ghUser', ghUser);
+            localStorage.setItem('ghRepo', ghRepo);
+            localStorage.setItem('ghToken', ghToken);
+            toggleConfig();
+            fetchRobotStatus(); // Újratöltjük a státuszt az új adatokkal
+            alert('Beállítások elmentve a böngésződben!');
+        }
+
+        // --- Robot Állapot lekérése ---
+        async function fetchRobotStatus() {
+            if (!ghUser || !ghRepo) {
+                document.getElementById('lastRunTime').innerText = "Beállítás szükséges (⚙️)";
+                document.getElementById('robotStatusIcon').className = "w-4 h-4 rounded-full bg-yellow-500";
+                return;
+            }
+
+            try {
+                // Lekérjük az utolsó futást a GitHub API-ról (ehhez nyilvános repónál token sem feltétlen kell, de ha van, jobb)
+                const headers = ghToken ? { 'Authorization': `token ${ghToken}` } : {};
+                const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/actions/workflows/gyujto.yml/runs?per_page=1`, { headers });
+                
+                if (!res.ok) throw new Error("API Hiba");
+                
+                const data = await res.json();
+                if (data.workflow_runs && data.workflow_runs.length > 0) {
+                    const run = data.workflow_runs[0];
+                    const runDate = new Date(run.updated_at);
+                    
+                    document.getElementById('lastRunTime').innerText = runDate.toLocaleString('hu-HU');
+                    
+                    const statusText = document.getElementById('lastRunStatus');
+                    const icon = document.getElementById('robotStatusIcon');
+                    
+                    if (run.status === 'in_progress' || run.status === 'queued') {
+                        statusText.innerText = "(Folyamatban...)";
+                        icon.className = "w-4 h-4 rounded-full bg-blue-500 animate-pulse";
+                    } else if (run.conclusion === 'success') {
+                        statusText.innerText = "(Sikeres lefutás)";
+                        icon.className = "w-4 h-4 rounded-full bg-green-500";
+                    } else {
+                        statusText.innerText = "(Hiba történt)";
+                        icon.className = "w-4 h-4 rounded-full bg-red-500";
+                    }
+                } else {
+                    document.getElementById('lastRunTime').innerText = "Még nem futott";
+                }
+            } catch (error) {
+                document.getElementById('lastRunTime').innerText = "Nem sikerült lekérni (hibás adatok?)";
+                document.getElementById('robotStatusIcon').className = "w-4 h-4 rounded-full bg-red-500";
+            }
+        }
+
+        // --- Robot Kézi Indítása ---
+        async function triggerRobot() {
+            if (!ghUser || !ghRepo || !ghToken) {
+                alert("A robot indításához előbb töltsd ki a GitHub beállításokat (⚙️ gomb)!");
+                toggleConfig();
+                return;
+            }
+
+            const btn = document.getElementById('triggerBtn');
+            btn.innerText = "⏳ Indítás...";
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            try {
+                const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/actions/workflows/gyujto.yml/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Authorization': `token ${ghToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ref: 'main' })
+                });
+
+                if (res.ok) {
+                    alert("✅ Parancs kiadva! A robot 10-20 másodpercen belül elindul a háttérben.");
+                    setTimeout(fetchRobotStatus, 15000); // 15 mp múlva ránézünk az állapotra
+                } else {
+                    const err = await res.json();
+                    alert(`❌ Hiba az indításkor: ${err.message}\nEllenőrizd a Tokent!`);
+                }
+            } catch (error) {
+                alert("Hálózati hiba történt.");
+            } finally {
+                btn.innerText = "⚡ Robot azonnali indítása";
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+
+        // --- Adatok betöltése ---
         window.onload = () => {
             loadData();
+            fetchRobotStatus();
+            // 30 másodpercenként frissítjük a robot státuszát
+            setInterval(fetchRobotStatus, 30000); 
         };
 
         function extractUicNumbers(obj, uicSet) {
@@ -115,11 +233,8 @@
         async function loadData() {
             const btn = document.getElementById('refreshBtn');
             btn.innerText = 'Töltés...';
-            btn.disabled = true;
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
-
+            
             try {
-                // 1. Háttérben lévő GitHub adatbázis letöltése
                 let dbData = [];
                 try {
                     const dbRes = await fetch(`${dbUrl}?t=${Date.now()}`);
@@ -127,15 +242,11 @@
                         dbData = await dbRes.json();
                         collectedUics = dbData;
                     }
-                } catch(e) {
-                    console.log("Még nincs adatbázis fájl (data.json) vagy nem elérhető.");
-                }
+                } catch(e) {}
                 
                 renderTable('collectedTableBody', 'collectedCount', dbData, true);
 
-                // 2. Aktuális élő adatok letöltése
                 const liveRes = await fetch(`${liveUrl}?t=${Date.now()}`);
-                if (!liveRes.ok) throw new Error(`Hiba: ${liveRes.status}`);
                 const liveDataRaw = await liveRes.json();
                 
                 let currentUics = new Set();
@@ -143,14 +254,12 @@
                 const currentArray = Array.from(currentUics);
 
                 renderTable('currentTableBody', 'currentCount', currentArray, false, dbData);
+                fetchRobotStatus();
 
             } catch (error) {
                 console.error(error);
-                alert("Hiba történt az adatok letöltésekor!");
             } finally {
                 btn.innerText = 'Képernyő frissítése';
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         }
 
@@ -159,74 +268,57 @@
             document.getElementById(countId).innerText = dataArray.length;
             
             if (dataArray.length === 0) {
-                tbody.innerHTML = '<tr><td class="p-3 text-gray-400 text-center">Nincs adat. (Ha most csináltad a repót, várj 10 percet a robotra!)</td></tr>';
+                tbody.innerHTML = '<tr><td class="p-3 text-gray-400 text-center">Nincs adat.</td></tr>';
                 return;
             }
 
-            // Tisztítás és rendezés beillesztés előtt
             let html = '';
             const sortedArray = dataArray.sort((a, b) => cleanUic(a).localeCompare(cleanUic(b), undefined, {numeric: true}));
 
             sortedArray.forEach(uic => {
                 let colorClass = isDb ? "text-green-300" : "text-gray-300";
                 let extraTag = "";
-                
-                // Ha a bal oszlopot rajzoljuk, és egy szám nincs benne a jobb oszlopban (adatbázisban)
                 if (!isDb && dbData.length > 0 && !dbData.includes(uic)) {
                     colorClass = "text-yellow-400 font-bold";
-                    extraTag = " <span class='text-xs bg-yellow-600 text-black px-1 rounded ml-2'>ÚJ A HÁLÓZATON</span>";
+                    extraTag = " <span class='text-xs bg-yellow-600 text-black px-1 rounded ml-2'>ÚJ</span>";
                 }
-
-                html += `<tr class='border-b border-gray-700 hover:bg-gray-700 transition-colors'><td class='p-3 font-mono ${colorClass}'>${uic}${extraTag}</td></tr>`;
+                html += `<tr class='border-b border-gray-700 hover:bg-gray-700'><td class='p-3 font-mono ${colorClass}'>${uic}${extraTag}</td></tr>`;
             });
             tbody.innerHTML = html;
         }
 
-        function exportCSV() {
-            if (collectedUics.length === 0) return alert('Nincs mit exportálni!');
-            
-            const dateString = new Date().toISOString().split('T')[0];
-            let csvContent = "UIC Palyaszam\n" + collectedUics.join("\n");
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `UIC-palyaszamok-${dateString}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function copyCollectedData() {
-            if (collectedUics.length === 0) return alert('Nincs mit másolni!');
-            navigator.clipboard.writeText(collectedUics.join('\n'))
-                .then(() => alert('Másolva!'))
-                .catch(() => alert('Hiba a másoláskor.'));
-        }
-
         const cleanUic = (str) => str.replace(/[\s-]/g, '');
-        let currentSortDesc = false;
-        let collectedSortDesc = false;
-
+        let currentSortDesc = false; let collectedSortDesc = false;
         function sortTable(tbodyId) {
             const tbody = document.getElementById(tbodyId);
             const rows = Array.from(tbody.querySelectorAll('tr'));
             if (rows.length === 0 || rows[0].innerText.includes('Nincs')) return;
-
             const isCurrent = tbodyId === 'currentTableBody';
             const desc = isCurrent ? currentSortDesc : collectedSortDesc;
-
             rows.sort((a, b) => {
-                const valA = cleanUic(a.cells[0].innerText.split(' ')[0]); // "ÚJ" taget ne vegye figyelembe
+                const valA = cleanUic(a.cells[0].innerText.split(' ')[0]);
                 const valB = cleanUic(b.cells[0].innerText.split(' ')[0]);
                 return desc ? valB.localeCompare(valA, undefined, {numeric: true}) : valA.localeCompare(valB, undefined, {numeric: true});
             });
-
-            if (isCurrent) currentSortDesc = !currentSortDesc;
-            else collectedSortDesc = !collectedSortDesc;
-
+            if (isCurrent) currentSortDesc = !currentSortDesc; else collectedSortDesc = !collectedSortDesc;
             tbody.innerHTML = '';
             rows.forEach(row => tbody.appendChild(row));
+        }
+
+        function exportCSV() {
+            if (collectedUics.length === 0) return alert('Nincs mit exportálni!');
+            const dateString = new Date().toISOString().split('T')[0];
+            let csvContent = "UIC Palyaszam\n" + collectedUics.join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `UIC-palyaszamok-${dateString}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function copyCollectedData() {
+            if (collectedUics.length === 0) return alert('Nincs mit másolni!');
+            navigator.clipboard.writeText(collectedUics.join('\n')).then(() => alert('Másolva!'));
         }
     </script>
 </body>
